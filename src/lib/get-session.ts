@@ -5,12 +5,12 @@ const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
 
 // NextAuth v5はcookie名が変わっているので両方試みる
 export async function getSessionUser(req: NextRequest): Promise<{ id: string; role: string } | null> {
-  // NextAuth v5: authjs.session-token
-  let token = await getToken({ req, secret, cookieName: "authjs.session-token" });
+  // 本番環境: __Secure-authjs.session-token
+  let token = await getToken({ req, secret, cookieName: "__Secure-authjs.session-token" });
   
-  // フォールバック: 旧cookie名
+  // 開発環境フォールバック
   if (!token) {
-    token = await getToken({ req, secret, cookieName: "__Secure-authjs.session-token" });
+    token = await getToken({ req, secret, cookieName: "authjs.session-token" });
   }
   if (!token) {
     token = await getToken({ req, secret });
