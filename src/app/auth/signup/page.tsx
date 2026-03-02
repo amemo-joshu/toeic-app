@@ -35,6 +35,8 @@ export default function SignUpPage() {
     router.push("/dashboard");
   };
 
+  const inputClass = "w-full border border-gray-300 rounded-lg px-4 py-3 text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500";
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-950 to-blue-900 flex items-center justify-center px-4">
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
@@ -52,13 +54,13 @@ export default function SignUpPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-sm font-medium text-gray-700 block mb-1">お名剁E/label>
+            <label className="text-sm font-medium text-gray-700 block mb-1">お名前</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-4 py-3 text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="山田 太郁E
+              className={inputClass}
+              placeholder="山田 太郎"
               required
             />
           </div>
@@ -68,19 +70,19 @@ export default function SignUpPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-4 py-3 text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className={inputClass}
               placeholder="example@email.com"
               required
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-gray-700 block mb-1">パスワーチE/label>
+            <label className="text-sm font-medium text-gray-700 block mb-1">パスワード</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-4 py-3 text-gray-900 placeholder-gray-400 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="8斁E��以丁E
+              className={inputClass}
+              placeholder="8文字以上"
               minLength={8}
               required
             />
@@ -90,7 +92,7 @@ export default function SignUpPage() {
             disabled={loading}
             className="w-full bg-yellow-400 hover:bg-yellow-300 text-blue-950 font-bold py-3 rounded-lg transition-colors disabled:opacity-50"
           >
-            {loading ? "登録中..." : "無料で始めめE}
+            {loading ? "登録中..." : "無料で始める"}
           </button>
         </form>
 
@@ -104,4 +106,3 @@ export default function SignUpPage() {
     </div>
   );
 }
-
