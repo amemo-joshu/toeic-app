@@ -30,5 +30,17 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "prisma/seed.ts",
+    "prisma/fill-gaps.ts",
+    "prisma/generate-vocab.ts",
+    "prisma/generate-vocab-continue.ts",
+    "prisma/seed-listening.ts",
+    "prisma/patch-vocab.ts",
+    "prisma/patch-vocab2.ts",
+    "prisma/patch-vocab3.ts",
+    "prisma/patch-final.ts",
+    "prisma/config.ts"
+  ]
 }
