@@ -21,7 +21,8 @@ export async function POST(req: NextRequest) {
     });
 
     return NextResponse.json({ id: user.id, name: user.name, email: user.email });
-  } catch {
+  } catch (e) {
+    console.error("Register error:", e);
     return NextResponse.json({ error: "サーバーエラーが発生しました" }, { status: 500 });
   }
 }
