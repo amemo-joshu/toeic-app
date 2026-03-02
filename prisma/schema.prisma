@@ -1,0 +1,95 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id             String    @id @default(cuid())
+  name           String?
+  email          String    @unique
+  password       String
+  role           String    @default("user")
+  streak         Int       @default(0)
+  lastStudiedAt  DateTime?
+  targetScore    Int       @default(700)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  answers        UserAnswer[]
+  studySessions  StudySession[]
+  userVocabs     UserVocabulary[]
+}
+
+model Question {
+  id            String   @id @default(cuid())
+  part          Int
+  questionText  String
+  passage       String?
+  audioScript   String?  // Part 1-4: TTSで読み上げるスクリプト
+  imageUrl      String?  // Part 1: 写真のURL
+  options       String   // JSON array
+  correctAnswer Int
+  explanation   String?
+  category      String?
+  difficulty    String   @default("medium")
+  createdAt     DateTime @default(now())
+
+  answers       UserAnswer[]
+}
+
+model UserAnswer {
+  id             String   @id @default(cuid())
+  userId         String
+  questionId     String
+  selectedAnswer Int
+  isCorrect      Boolean
+  answeredAt     DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
+
+model Vocabulary {
+  id         String @id @default(cuid())
+  word       String
+  meaning    String
+  example    String?
+  category   String?
+  difficulty String @default("medium")
+  level      Int    @default(1)
+
+  userVocabs UserVocabulary[]
+}
+
+model UserVocabulary {
+  id           String   @id @default(cuid())
+  userId       String
+  vocabId      String
+  nextReviewAt DateTime @default(now())
+  interval     Int      @default(1)
+  easeFactor   Float    @default(2.5)
+  correctCount Int      @default(0)
+  wrongCount   Int      @default(0)
+
+  user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vocab Vocabulary @relation(fields: [vocabId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, vocabId])
+}
+
+model StudySession {
+  id             String   @id @default(cuid())
+  userId         String
+  part           Int
+  totalQuestions Int
+  correctCount   Int
+  duration       Int      // seconds
+  createdAt      DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
