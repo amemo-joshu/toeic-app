@@ -371,7 +371,7 @@ export default function VocabularyPage() {
               className={`w-full border-2 rounded-xl px-4 py-3 text-lg font-medium focus:outline-none transition-colors ${
                 result === "correct" ? "border-green-400 bg-green-50 text-green-700" :
                 result === "wrong" ? "border-red-400 bg-red-50 text-red-700" :
-                "border-gray-200 focus:border-blue-400"
+                "border-gray-200 bg-white text-gray-900 focus:border-blue-400"
               }`}
             />
           </div>

@@ -301,7 +301,7 @@ export default function AIChatPage() {
                 className={`flex-1 border rounded-xl px-4 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 transition-colors ${
                   listening
                     ? "border-red-400 bg-red-50 focus:ring-red-300"
-                    : "border-gray-200 focus:ring-blue-400"
+                    : "border-gray-200 bg-white text-gray-900 focus:ring-blue-400"
                 }`}
               />
               {/* Mic button */}
