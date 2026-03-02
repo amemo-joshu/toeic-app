@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { getToken } from "next-auth/jwt";
+import { getSessionUser } from "@/lib/get-session";
 
 export async function GET(req: NextRequest) {
-  const token = await getToken({ req, secret: process.env.AUTH_SECRET });
-  if (!token?.id) return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
+  const user = await getSessionUser(req);
+  if (!user) return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
   const part = searchParams.get("part");
@@ -20,11 +20,10 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const token = await getToken({ req, secret: process.env.AUTH_SECRET });
-  if (!token?.id || token.role !== "admin") {
+  const user = await getSessionUser(req);
+  if (!user || user.role !== "admin") {
     return NextResponse.json({ error: "権限がありません" }, { status: 403 });
   }
-
   const data = await req.json();
   const question = await prisma.question.create({ data });
   return NextResponse.json(question);
