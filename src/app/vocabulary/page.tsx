@@ -92,19 +92,20 @@ export default function VocabularyPage() {
     setLoading(true);
     resetSession();
     // APIがランダム10問を返す
-    const res = await fetch(`/api/vocabulary?level=${level}&limit=10&t=${Date.now()}`);
+    const res = await fetch(`/api/vocabulary?level=${level}&limit=10&t=${Date.now()}`, { cache: "no-store" });
     const data: VocabItem[] = await res.json();
     setCards(data);
     setQueue(data);
     setSelectedLevel(level);
     setMode("normal");
     setLoading(false);
+    setTimeout(focusInput, 150);
   };
 
   const loadReview = async () => {
     setLoading(true);
     resetSession();
-    const res = await fetch(`/api/vocabulary?mode=review&limit=10&t=${Date.now()}`);
+    const res = await fetch(`/api/vocabulary?mode=review&limit=10&t=${Date.now()}`, { cache: "no-store" });
     const data: VocabItem[] = await res.json();
     setCards(data);
     setQueue(data);
@@ -122,21 +123,21 @@ export default function VocabularyPage() {
     setFinished(false);
   };
 
-  // 回答前はinputにフォーカス、回答後は次へボタンにフォーカス
+  const focusInput = () => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.focus();
+  };
+
+  // PC向け: current/result 変化時にフォーカス（useEffect）
   useEffect(() => {
     if (result === null) {
-      setTimeout(() => {
-        const el = inputRef.current;
-        if (!el) return;
-        el.focus({ preventScroll: false });
-        // iOS Safari 対策: readOnly を一瞬切り替えてフォーカスを強制
-        el.removeAttribute("readonly");
-        el.focus();
-      }, 100);
+      setTimeout(focusInput, 50);
     } else {
       setTimeout(() => nextBtnRef.current?.focus(), 50);
     }
-  }, [current, result, finished]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current, result]);
 
   const handleHint = () => {
     const word = queue[current]?.word ?? "";
@@ -180,6 +181,8 @@ export default function VocabularyPage() {
       setInput("");
       setHint("");
       setResult(null);
+      // iOS Safari: ユーザー操作ハンドラ内で直接フォーカス
+      setTimeout(focusInput, 50);
     }
   };
 
