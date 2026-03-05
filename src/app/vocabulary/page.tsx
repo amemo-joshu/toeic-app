@@ -295,7 +295,7 @@ export default function VocabularyPage() {
                   onClick={() => loadLevel(selectedLevel)}
                   className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-5 py-2.5 rounded-xl transition-colors"
                 >
-                  もう一度
+                  次の10問 →
                 </button>
               )}
               {mode === "normal" && selectedLevel !== null && selectedLevel < 5 && (
