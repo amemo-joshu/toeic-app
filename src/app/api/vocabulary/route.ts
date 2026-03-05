@@ -60,7 +60,12 @@ export async function GET(req: NextRequest) {
     progress: (r.correctCount !== null || r.wrongCount !== null)
       ? { correctCount: r.correctCount ?? 0, wrongCount: r.wrongCount ?? 0 }
       : null,
-  })));
+  })), {
+    headers: {
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+      "Pragma": "no-cache",
+    },
+  });
 }
 
 export async function POST(req: NextRequest) {

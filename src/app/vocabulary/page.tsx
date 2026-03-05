@@ -177,12 +177,15 @@ export default function VocabularyPage() {
     if (current + 1 >= queue.length) {
       setFinished(true);
     } else {
+      // iOS: readOnly を先に外してから同期的にフォーカス（gesture context 内）
+      if (inputRef.current) {
+        inputRef.current.readOnly = false;
+        inputRef.current.focus();
+      }
       setCurrent((p) => p + 1);
       setInput("");
       setHint("");
       setResult(null);
-      // iOS Safari: ユーザー操作ハンドラ内で直接フォーカス
-      setTimeout(focusInput, 50);
     }
   };
 
@@ -379,9 +382,9 @@ export default function VocabularyPage() {
               autoCapitalize="off"
               spellCheck={false}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={(e) => { if (!result) setInput(e.target.value); }}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (!result) handleSubmit(); } }}
-              disabled={!!result}
+              readOnly={!!result}
               placeholder={hint ? hint + "..." : "英単語を入力..."}
               className={`w-full border-2 rounded-xl px-4 py-3 text-lg font-medium focus:outline-none transition-colors ${
                 result === "correct" ? "border-green-400 bg-green-50 text-green-700" :
