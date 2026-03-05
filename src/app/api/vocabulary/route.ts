@@ -72,7 +72,60 @@ export async function POST(req: NextRequest) {
   const user = await getSessionUser(req);
   if (!user) return NextResponse.json({ error: "認証が必要です" }, { status: 401 });
 
-  const { vocabId, correct } = await req.json();
+  const body = await req.json();
+
+  // action: "fetch" → 単語取得（POSTでキャッシュ回避）
+  if (body.action === "fetch") {
+    const { level, mode, limit = 10 } = body;
+
+    if (mode === "review") {
+      const wrongVocabs = await prisma.userVocabulary.findMany({
+        where: { userId: user.id, wrongCount: { gt: 0 } },
+        include: { vocab: true },
+        orderBy: { wrongCount: "desc" },
+        take: limit * 3,
+      });
+      const shuffled = wrongVocabs.sort(() => Math.random() - 0.5).slice(0, limit);
+      return NextResponse.json(shuffled.map(uv => ({
+        ...uv.vocab,
+        progress: { correctCount: uv.correctCount, wrongCount: uv.wrongCount },
+      })));
+    }
+
+    const lvl = level ? parseInt(level) : null;
+    type RawRow = {
+      id: string; word: string; meaning: string; example: string | null;
+      category: string | null; level: number;
+      correctCount: number | null; wrongCount: number | null;
+    };
+    const rows: RawRow[] = await prisma.$queryRaw`
+      SELECT
+        v.id, v.word, v.meaning, v.example, v.category, v.level,
+        uv."correctCount", uv."wrongCount"
+      FROM "Vocabulary" v
+      LEFT JOIN "UserVocabulary" uv
+        ON v.id = uv."vocabId" AND uv."userId" = ${user.id}
+      WHERE ${lvl !== null ? Prisma.sql`v.level = ${lvl}` : Prisma.sql`TRUE`}
+      ORDER BY (
+        COALESCE(
+          CAST(uv."wrongCount" AS float) /
+          NULLIF(COALESCE(uv."correctCount",0) + COALESCE(uv."wrongCount",0), 0),
+          0.3
+        ) * 1.5 + RANDOM()
+      ) DESC
+      LIMIT ${limit}
+    `;
+    return NextResponse.json(rows.map(r => ({
+      id: r.id, word: r.word, meaning: r.meaning,
+      example: r.example, category: r.category, level: r.level,
+      progress: (r.correctCount !== null || r.wrongCount !== null)
+        ? { correctCount: r.correctCount ?? 0, wrongCount: r.wrongCount ?? 0 }
+        : null,
+    })));
+  }
+
+  // action: "answer" or legacy → 回答記録
+  const { vocabId, correct } = body;
   const existing = await prisma.userVocabulary.findUnique({
     where: { userId_vocabId: { userId: user.id, vocabId } },
   });

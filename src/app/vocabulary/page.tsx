@@ -92,7 +92,11 @@ export default function VocabularyPage() {
     setLoading(true);
     resetSession();
     // APIがランダム10問を返す
-    const res = await fetch(`/api/vocabulary?level=${level}&limit=10&t=${Date.now()}`, { cache: "no-store" });
+    const res = await fetch("/api/vocabulary", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "fetch", level: String(level), limit: 10 }),
+    });
     const data: VocabItem[] = await res.json();
     setCards(data);
     setQueue(data);
@@ -105,7 +109,11 @@ export default function VocabularyPage() {
   const loadReview = async () => {
     setLoading(true);
     resetSession();
-    const res = await fetch(`/api/vocabulary?mode=review&limit=10&t=${Date.now()}`, { cache: "no-store" });
+    const res = await fetch("/api/vocabulary", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "fetch", mode: "review", limit: 10 }),
+    });
     const data: VocabItem[] = await res.json();
     setCards(data);
     setQueue(data);
