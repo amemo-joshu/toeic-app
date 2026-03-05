@@ -92,7 +92,7 @@ export default function VocabularyPage() {
     setLoading(true);
     resetSession();
     // APIがランダム10問を返す
-    const res = await fetch(`/api/vocabulary?level=${level}&limit=10`);
+    const res = await fetch(`/api/vocabulary?level=${level}&limit=10&t=${Date.now()}`);
     const data: VocabItem[] = await res.json();
     setCards(data);
     setQueue(data);
@@ -104,7 +104,7 @@ export default function VocabularyPage() {
   const loadReview = async () => {
     setLoading(true);
     resetSession();
-    const res = await fetch(`/api/vocabulary?mode=review&limit=10`);
+    const res = await fetch(`/api/vocabulary?mode=review&limit=10&t=${Date.now()}`);
     const data: VocabItem[] = await res.json();
     setCards(data);
     setQueue(data);
