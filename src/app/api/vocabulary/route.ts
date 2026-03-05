@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { getSessionUser } from "@/lib/get-session";
 
 export const dynamic = "force-dynamic";
@@ -26,42 +27,40 @@ export async function GET(req: NextRequest) {
     })));
   }
 
-  const where = level ? { level: parseInt(level) } : {};
+  const lvl = level ? parseInt(level) : null;
 
-  // 全単語 + ユーザーの進捗を一括取得
-  const allVocabs = await prisma.vocabulary.findMany({ where });
-  const allIds = allVocabs.map(v => v.id);
-  const userVocabs = await prisma.userVocabulary.findMany({
-    where: { userId: user.id, vocabId: { in: allIds } },
-    select: { vocabId: true, correctCount: true, wrongCount: true },
-  });
-  const progressMap = Object.fromEntries(userVocabs.map(v => [v.vocabId, v]));
+  // PostgreSQL の RANDOM() + 苦手優先スコアでDB側でランダム選択
+  type RawRow = {
+    id: string; word: string; meaning: string; example: string | null;
+    category: string | null; level: number;
+    correctCount: number | null; wrongCount: number | null;
+  };
 
-  // 優先度スコア付きでシャッフル（Fisher-Yates + 重み付き）
-  // スコア = ランダム値 + 苦手ボーナス（wrongRate が高いほど優先）
-  const scored = allVocabs.map(v => {
-    const prog = progressMap[v.id];
-    let wrongRate = 0;
-    if (prog) {
-      const total = prog.correctCount + prog.wrongCount;
-      wrongRate = total > 0 ? prog.wrongCount / total : 0;
-    }
-    const neverSeen = !prog ? 0.3 : 0; // 未学習にも少しボーナス
-    const score = Math.random() + wrongRate * 1.5 + neverSeen;
-    return { vocab: v, score };
-  });
+  const rows: RawRow[] = await prisma.$queryRaw`
+    SELECT
+      v.id, v.word, v.meaning, v.example, v.category, v.level,
+      uv."correctCount", uv."wrongCount"
+    FROM "Vocabulary" v
+    LEFT JOIN "UserVocabulary" uv
+      ON v.id = uv."vocabId" AND uv."userId" = ${user.id}
+    WHERE ${lvl !== null ? Prisma.sql`v.level = ${lvl}` : Prisma.sql`TRUE`}
+    ORDER BY (
+      COALESCE(
+        CAST(uv."wrongCount" AS float) /
+        NULLIF(COALESCE(uv."correctCount",0) + COALESCE(uv."wrongCount",0), 0),
+        0.3
+      ) * 1.5 + RANDOM()
+    ) DESC
+    LIMIT ${limit}
+  `;
 
-  // スコア降順でソートして上位 limit 件を取得
-  scored.sort((a, b) => b.score - a.score);
-  const selected = scored.slice(0, limit).map(s => s.vocab);
-
-  // Fisher-Yates で選ばれた単語の順番をシャッフル
-  for (let i = selected.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [selected[i], selected[j]] = [selected[j], selected[i]];
-  }
-
-  return NextResponse.json(selected.map(v => ({ ...v, progress: progressMap[v.id] || null })));
+  return NextResponse.json(rows.map(r => ({
+    id: r.id, word: r.word, meaning: r.meaning,
+    example: r.example, category: r.category, level: r.level,
+    progress: (r.correctCount !== null || r.wrongCount !== null)
+      ? { correctCount: r.correctCount ?? 0, wrongCount: r.wrongCount ?? 0 }
+      : null,
+  })));
 }
 
 export async function POST(req: NextRequest) {

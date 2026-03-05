@@ -125,11 +125,18 @@ export default function VocabularyPage() {
   // 回答前はinputにフォーカス、回答後は次へボタンにフォーカス
   useEffect(() => {
     if (result === null) {
-      setTimeout(() => inputRef.current?.focus(), 50);
+      setTimeout(() => {
+        const el = inputRef.current;
+        if (!el) return;
+        el.focus({ preventScroll: false });
+        // iOS Safari 対策: readOnly を一瞬切り替えてフォーカスを強制
+        el.removeAttribute("readonly");
+        el.focus();
+      }, 100);
     } else {
       setTimeout(() => nextBtnRef.current?.focus(), 50);
     }
-  }, [current, result]);
+  }, [current, result, finished]);
 
   const handleHint = () => {
     const word = queue[current]?.word ?? "";
@@ -363,6 +370,11 @@ export default function VocabularyPage() {
             <input
               ref={inputRef}
               type="text"
+              inputMode="text"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (!result) handleSubmit(); } }}
