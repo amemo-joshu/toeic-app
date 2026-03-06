@@ -379,7 +379,6 @@ export default function VocabularyPage() {
         {/* Progress */}
         <div className="flex items-center gap-3 mb-6">
           <span className="text-sm text-gray-500 shrink-0">{current + 1} / {queue.length}</span>
-          {fetchTs > 0 && <span className="text-xs text-gray-300 ml-1">#{String(fetchTs).slice(-5)}</span>}
           <div className="flex-1 bg-gray-200 rounded-full h-2.5">
             <div className={`${li.color} h-2.5 rounded-full transition-all duration-500`} style={{ width: `${progress}%` }} />
           </div>
