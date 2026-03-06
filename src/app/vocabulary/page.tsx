@@ -125,14 +125,24 @@ export default function VocabularyPage() {
   };
 
   const loadLevel = (level: number) => {
-    resetSession();
+    setFinished(false);
+    setLoading(true);
+    setQueue([]);
+    setCurrent(0);
+    setInput(""); setHint(""); setResult(null);
+    setStats({ correct: 0, wrong: 0 }); setWrongWords([]);
     setSelectedLevel(level);
     setMode("normal");
     setSessionKey(prev => ({ level, seq: (prev?.seq ?? 0) + 1 }));
   };
 
   const loadReview = () => {
-    resetSession();
+    setFinished(false);
+    setLoading(true);
+    setQueue([]);
+    setCurrent(0);
+    setInput(""); setHint(""); setResult(null);
+    setStats({ correct: 0, wrong: 0 }); setWrongWords([]);
     setSelectedLevel(null);
     setMode("review");
     setSessionKey(prev => ({ level: -1, seq: (prev?.seq ?? 0) + 1 }));
@@ -356,8 +366,18 @@ export default function VocabularyPage() {
     );
   }
 
+  // queue が空またはロード中はローディング表示
+  if (!queue.length || !queue[current]) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="flex items-center justify-center h-64 text-gray-400">読み込み中...</div>
+      </div>
+    );
+  }
+
   const card = queue[current];
-  const li = LEVEL_INFO.find((l) => l.level === selectedLevel)!;
+  const li = LEVEL_INFO.find((l) => l.level === selectedLevel) ?? LEVEL_INFO[0];;
   const progress = ((current) / queue.length) * 100;
 
   return (
