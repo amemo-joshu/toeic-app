@@ -96,10 +96,15 @@ export default function VocabularyPage() {
         const res = await fetch("/api/vocabulary", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify(body),
         });
         const raw = await res.json();
         if (cancelled) return;
+        if (!res.ok) {
+          console.error("Vocab fetch error:", raw);
+          return;
+        }
         const data: VocabItem[] = Array.isArray(raw) ? raw : [];
         setFetchTs(Date.now());
         setCards(data);
@@ -366,12 +371,26 @@ export default function VocabularyPage() {
     );
   }
 
-  // queue が空またはロード中はローディング表示
-  if (!queue.length || !queue[current]) {
+  // queue が空のとき
+  if (!queue.length) {
     return (
       <div className="min-h-screen bg-gray-50">
         <Navbar />
-        <div className="flex items-center justify-center h-64 text-gray-400">読み込み中...</div>
+        <div className="flex flex-col items-center justify-center h-64 gap-4">
+          {loading ? (
+            <p className="text-gray-400">読み込み中...</p>
+          ) : (
+            <>
+              <p className="text-gray-400">単語を取得できませんでした</p>
+              <button
+                onClick={() => { setSelectedLevel(null); setSessionKey(null); }}
+                className="text-blue-600 underline text-sm"
+              >
+                ← レベル選択に戻る
+              </button>
+            </>
+          )}
+        </div>
       </div>
     );
   }
