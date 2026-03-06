@@ -76,9 +76,10 @@ export async function POST(req: NextRequest) {
     const lvl = level ? parseInt(level) : null;
     const where = lvl !== null ? { level: lvl } : {};
 
-    // 全単語取得
+    // 全単語取得 → crypto Fisher-Yates でシャッフル → 上位 limit 件
     const allVocabs = await prisma.vocabulary.findMany({ where });
     const allIds = allVocabs.map(v => v.id);
+    const selected = shuffle(allVocabs).slice(0, limit);
 
     // ユーザー進捗取得
     const userVocabs = await prisma.userVocabulary.findMany({
@@ -86,21 +87,6 @@ export async function POST(req: NextRequest) {
       select: { vocabId: true, correctCount: true, wrongCount: true },
     });
     const progressMap = new Map(userVocabs.map(v => [v.vocabId, v]));
-
-    // 各単語にスコア付け: crypto乱数 + 苦手ボーナス
-    const rand = () => randomBytes(4).readUInt32BE(0) / 0xFFFFFFFF;
-    const scored = allVocabs.map(v => {
-      const prog = progressMap.get(v.id);
-      const wrongBonus = prog
-        ? (prog.wrongCount / Math.max(prog.correctCount + prog.wrongCount, 1)) * 2
-        : 0.5; // 未学習ボーナス
-      return { v, score: rand() + wrongBonus };
-    });
-
-    // スコア降順でソートして上位 limit 件を取得し、再シャッフル
-    scored.sort((a, b) => b.score - a.score);
-    const top = scored.slice(0, limit).map(s => s.v);
-    const selected = shuffle(top);
 
     return NextResponse.json(selected.map(v => ({
       ...v,
