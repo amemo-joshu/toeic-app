@@ -533,7 +533,8 @@ async function main() {
   await prisma.studySession.deleteMany();
   await prisma.vocabulary.deleteMany();
   await prisma.question.deleteMany();
-  await prisma.user.deleteMany();
+  // ユーザーは削除しない（既存アカウントを保護）
+  // await prisma.user.deleteMany();
 
   // Admin user
   const adminPassword = await bcrypt.hash("admin123456", 12);
