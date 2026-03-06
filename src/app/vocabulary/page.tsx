@@ -42,6 +42,8 @@ export default function VocabularyPage() {
   const [loading, setLoading] = useState(false);
   const [reviewCount, setReviewCount] = useState(0);
   const [fetchTs, setFetchTs] = useState<number>(0);
+  // セッションカウンター: 変化するたびに useEffect でフェッチ発火
+  const [sessionKey, setSessionKey] = useState<{ level: number; seq: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const nextBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -80,6 +82,38 @@ export default function VocabularyPage() {
     if (status === "unauthenticated") router.push("/auth/signin");
   }, [status, router]);
 
+  // sessionKey が変わるたびに必ずフェッチ
+  useEffect(() => {
+    if (!sessionKey) return;
+    let cancelled = false;
+    const doFetch = async () => {
+      setLoading(true);
+      setQueue([]);
+      try {
+        const body = sessionKey.level === -1
+          ? { action: "fetch", mode: "review", limit: 10 }
+          : { action: "fetch", level: String(sessionKey.level), limit: 10 };
+        const res = await fetch("/api/vocabulary", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const raw = await res.json();
+        if (cancelled) return;
+        const data: VocabItem[] = Array.isArray(raw) ? raw : [];
+        setFetchTs(Date.now());
+        setCards(data);
+        setQueue(data);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+      setTimeout(focusInput, 200);
+    };
+    doFetch();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionKey]);
+
   const resetSession = () => {
     setCurrent(0);
     setInput("");
@@ -90,41 +124,18 @@ export default function VocabularyPage() {
     setFinished(false);
   };
 
-  const loadLevel = async (level: number) => {
-    setLoading(true);
-    setQueue([]); // 古いデータを即クリア
+  const loadLevel = (level: number) => {
     resetSession();
-    const res = await fetch("/api/vocabulary", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "fetch", level: String(level), limit: 10 }),
-    });
-    const raw = await res.json();
-    const data: VocabItem[] = Array.isArray(raw) ? raw : [];
-    const ts = data[0]?._ts ?? Date.now();
-    setFetchTs(ts);
-    setCards(data);
-    setQueue(data);
     setSelectedLevel(level);
     setMode("normal");
-    setLoading(false);
-    setTimeout(focusInput, 150);
+    setSessionKey(prev => ({ level, seq: (prev?.seq ?? 0) + 1 }));
   };
 
-  const loadReview = async () => {
-    setLoading(true);
+  const loadReview = () => {
     resetSession();
-    const res = await fetch("/api/vocabulary", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "fetch", mode: "review", limit: 10 }),
-    });
-    const data: VocabItem[] = await res.json();
-    setCards(data);
-    setQueue(data);
     setSelectedLevel(null);
     setMode("review");
-    setLoading(false);
+    setSessionKey(prev => ({ level: -1, seq: (prev?.seq ?? 0) + 1 }));
   };
 
   const loadWrongOnly = () => {
