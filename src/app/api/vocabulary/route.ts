@@ -1,9 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@prisma/client";
 import { getSessionUser } from "@/lib/get-session";
+// Prisma import removed (no longer using $queryRaw)
+import { randomBytes } from "crypto";
 
 export const dynamic = "force-dynamic";
+
+// crypto ベースの Fisher-Yates シャッフル（真のランダム）
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = randomBytes(4).readUInt32BE(0) % (i + 1);
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
 export async function GET(req: NextRequest) {
   const user = await getSessionUser(req);
@@ -27,44 +38,12 @@ export async function GET(req: NextRequest) {
     })));
   }
 
-  const lvl = level ? parseInt(level) : null;
-
-  // PostgreSQL の RANDOM() + 苦手優先スコアでDB側でランダム選択
-  type RawRow = {
-    id: string; word: string; meaning: string; example: string | null;
-    category: string | null; level: number;
-    correctCount: number | null; wrongCount: number | null;
-  };
-
-  const rows: RawRow[] = await prisma.$queryRaw`
-    SELECT
-      v.id, v.word, v.meaning, v.example, v.category, v.level,
-      uv."correctCount", uv."wrongCount"
-    FROM "Vocabulary" v
-    LEFT JOIN "UserVocabulary" uv
-      ON v.id = uv."vocabId" AND uv."userId" = ${user.id}
-    WHERE ${lvl !== null ? Prisma.sql`v.level = ${lvl}` : Prisma.sql`TRUE`}
-    ORDER BY (
-      COALESCE(
-        CAST(uv."wrongCount" AS float) /
-        NULLIF(COALESCE(uv."correctCount",0) + COALESCE(uv."wrongCount",0), 0),
-        0.3
-      ) * 1.5 + RANDOM()
-    ) DESC
-    LIMIT ${limit}
-  `;
-
-  return NextResponse.json(rows.map(r => ({
-    id: r.id, word: r.word, meaning: r.meaning,
-    example: r.example, category: r.category, level: r.level,
-    progress: (r.correctCount !== null || r.wrongCount !== null)
-      ? { correctCount: r.correctCount ?? 0, wrongCount: r.wrongCount ?? 0 }
-      : null,
-  })), {
-    headers: {
-      "Cache-Control": "no-store, no-cache, must-revalidate",
-      "Pragma": "no-cache",
-    },
+  // GETは後方互換のため残すが、フロントはPOSTを使用
+  const where = level ? { level: parseInt(level) } : {};
+  const allVocabs = await prisma.vocabulary.findMany({ where });
+  const shuffled = shuffle(allVocabs).slice(0, limit);
+  return NextResponse.json(shuffled.map(v => ({ ...v, progress: null })), {
+    headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
   });
 }
 
@@ -93,33 +72,51 @@ export async function POST(req: NextRequest) {
     }
 
     const lvl = level ? parseInt(level) : null;
-    type RawRow = {
-      id: string; word: string; meaning: string; example: string | null;
-      category: string | null; level: number;
-      correctCount: number | null; wrongCount: number | null;
-    };
-    const rows: RawRow[] = await prisma.$queryRaw`
-      SELECT
-        v.id, v.word, v.meaning, v.example, v.category, v.level,
-        uv."correctCount", uv."wrongCount"
-      FROM "Vocabulary" v
-      LEFT JOIN "UserVocabulary" uv
-        ON v.id = uv."vocabId" AND uv."userId" = ${user.id}
-      WHERE ${lvl !== null ? Prisma.sql`v.level = ${lvl}` : Prisma.sql`TRUE`}
-      ORDER BY (
-        COALESCE(
-          CAST(uv."wrongCount" AS float) /
-          NULLIF(COALESCE(uv."correctCount",0) + COALESCE(uv."wrongCount",0), 0),
-          0.3
-        ) * 1.5 + RANDOM()
-      ) DESC
-      LIMIT ${limit}
-    `;
-    return NextResponse.json(rows.map(r => ({
-      id: r.id, word: r.word, meaning: r.meaning,
-      example: r.example, category: r.category, level: r.level,
-      progress: (r.correctCount !== null || r.wrongCount !== null)
-        ? { correctCount: r.correctCount ?? 0, wrongCount: r.wrongCount ?? 0 }
+    const where = lvl !== null ? { level: lvl } : {};
+
+    // 全単語取得
+    const allVocabs = await prisma.vocabulary.findMany({ where });
+    const allIds = allVocabs.map(v => v.id);
+
+    // ユーザー進捗取得
+    const userVocabs = await prisma.userVocabulary.findMany({
+      where: { userId: user.id, vocabId: { in: allIds } },
+      select: { vocabId: true, correctCount: true, wrongCount: true },
+    });
+    const progressMap = new Map(userVocabs.map(v => [v.vocabId, v]));
+
+    // 苦手スコアで重み付け
+    const weighted = allVocabs.map(v => {
+      const prog = progressMap.get(v.id);
+      let weight = 1;
+      if (!prog) {
+        weight = 2; // 未学習
+      } else {
+        const total = prog.correctCount + prog.wrongCount;
+        if (total > 0) weight = 1 + (prog.wrongCount / total) * 3;
+      }
+      return { v, weight };
+    });
+
+    // 重み付きランダム選択（crypto ベース）
+    const totalWeight = weighted.reduce((s, x) => s + x.weight, 0);
+    const selected: typeof allVocabs = [];
+    const remaining = [...weighted];
+    for (let i = 0; i < Math.min(limit, remaining.length); i++) {
+      let rand = (randomBytes(4).readUInt32BE(0) / 0xffffffff) * remaining.reduce((s, x) => s + x.weight, 0);
+      let idx = 0;
+      for (idx = 0; idx < remaining.length - 1; idx++) {
+        rand -= remaining[idx].weight;
+        if (rand <= 0) break;
+      }
+      selected.push(remaining[idx].v);
+      remaining.splice(idx, 1);
+    }
+
+    return NextResponse.json(selected.map(v => ({
+      ...v,
+      progress: progressMap.has(v.id)
+        ? { correctCount: progressMap.get(v.id)!.correctCount, wrongCount: progressMap.get(v.id)!.wrongCount }
         : null,
     })));
   }
