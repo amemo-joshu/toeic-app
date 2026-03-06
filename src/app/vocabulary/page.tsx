@@ -13,6 +13,7 @@ interface VocabItem {
   category?: string;
   level: number;
   progress: { correctCount: number; wrongCount: number } | null;
+  _ts?: number;
 }
 
 const LEVEL_INFO = [
@@ -40,6 +41,7 @@ export default function VocabularyPage() {
   const [finished, setFinished] = useState(false);
   const [loading, setLoading] = useState(false);
   const [reviewCount, setReviewCount] = useState(0);
+  const [fetchTs, setFetchTs] = useState<number>(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const nextBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -90,14 +92,17 @@ export default function VocabularyPage() {
 
   const loadLevel = async (level: number) => {
     setLoading(true);
+    setQueue([]); // 古いデータを即クリア
     resetSession();
-    // APIがランダム10問を返す
     const res = await fetch("/api/vocabulary", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "fetch", level: String(level), limit: 10 }),
     });
-    const data: VocabItem[] = await res.json();
+    const raw = await res.json();
+    const data: VocabItem[] = Array.isArray(raw) ? raw : [];
+    const ts = data[0]?._ts ?? Date.now();
+    setFetchTs(ts);
     setCards(data);
     setQueue(data);
     setSelectedLevel(level);
@@ -363,6 +368,7 @@ export default function VocabularyPage() {
         {/* Progress */}
         <div className="flex items-center gap-3 mb-6">
           <span className="text-sm text-gray-500 shrink-0">{current + 1} / {queue.length}</span>
+          {fetchTs > 0 && <span className="text-xs text-gray-300 ml-1">#{String(fetchTs).slice(-5)}</span>}
           <div className="flex-1 bg-gray-200 rounded-full h-2.5">
             <div className={`${li.color} h-2.5 rounded-full transition-all duration-500`} style={{ width: `${progress}%` }} />
           </div>

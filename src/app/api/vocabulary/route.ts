@@ -55,19 +55,21 @@ export async function POST(req: NextRequest) {
 
   // action: "fetch" → 単語取得（POSTでキャッシュ回避）
   if (body.action === "fetch") {
-    const { level, mode, limit = 10 } = body;
+    const level: string | undefined = body.level;
+    const mode: string | undefined = body.mode;
+    const limit: number = Number(body.limit) || 10;
 
     if (mode === "review") {
       const wrongVocabs = await prisma.userVocabulary.findMany({
         where: { userId: user.id, wrongCount: { gt: 0 } },
         include: { vocab: true },
         orderBy: { wrongCount: "desc" },
-        take: limit * 3,
       });
-      const shuffled = wrongVocabs.sort(() => Math.random() - 0.5).slice(0, limit);
-      return NextResponse.json(shuffled.map(uv => ({
+      const selected = shuffle(wrongVocabs).slice(0, limit);
+      return NextResponse.json(selected.map(uv => ({
         ...uv.vocab,
         progress: { correctCount: uv.correctCount, wrongCount: uv.wrongCount },
+        _ts: Date.now(),
       })));
     }
 
@@ -85,39 +87,27 @@ export async function POST(req: NextRequest) {
     });
     const progressMap = new Map(userVocabs.map(v => [v.vocabId, v]));
 
-    // 苦手スコアで重み付け
-    const weighted = allVocabs.map(v => {
+    // 各単語にスコア付け: crypto乱数 + 苦手ボーナス
+    const rand = () => randomBytes(4).readUInt32BE(0) / 0xFFFFFFFF;
+    const scored = allVocabs.map(v => {
       const prog = progressMap.get(v.id);
-      let weight = 1;
-      if (!prog) {
-        weight = 2; // 未学習
-      } else {
-        const total = prog.correctCount + prog.wrongCount;
-        if (total > 0) weight = 1 + (prog.wrongCount / total) * 3;
-      }
-      return { v, weight };
+      const wrongBonus = prog
+        ? (prog.wrongCount / Math.max(prog.correctCount + prog.wrongCount, 1)) * 2
+        : 0.5; // 未学習ボーナス
+      return { v, score: rand() + wrongBonus };
     });
 
-    // 重み付きランダム選択（crypto ベース）
-    const totalWeight = weighted.reduce((s, x) => s + x.weight, 0);
-    const selected: typeof allVocabs = [];
-    const remaining = [...weighted];
-    for (let i = 0; i < Math.min(limit, remaining.length); i++) {
-      let rand = (randomBytes(4).readUInt32BE(0) / 0xffffffff) * remaining.reduce((s, x) => s + x.weight, 0);
-      let idx = 0;
-      for (idx = 0; idx < remaining.length - 1; idx++) {
-        rand -= remaining[idx].weight;
-        if (rand <= 0) break;
-      }
-      selected.push(remaining[idx].v);
-      remaining.splice(idx, 1);
-    }
+    // スコア降順でソートして上位 limit 件を取得し、再シャッフル
+    scored.sort((a, b) => b.score - a.score);
+    const top = scored.slice(0, limit).map(s => s.v);
+    const selected = shuffle(top);
 
     return NextResponse.json(selected.map(v => ({
       ...v,
       progress: progressMap.has(v.id)
         ? { correctCount: progressMap.get(v.id)!.correctCount, wrongCount: progressMap.get(v.id)!.wrongCount }
         : null,
+      _ts: Date.now(),
     })));
   }
 
